@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Claude Code status line: context summary + session cost + real usage windows"""
-import sys, json, os, time, urllib.request, re, shutil
+import sys, json, os, time, urllib.request
 from datetime import datetime, timezone
 
 sys.stdout.reconfigure(encoding="utf-8")
@@ -99,12 +99,6 @@ def window_color(utilization, resets_at_iso, threshold_per_unit, unit_secs):
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
-ANSI_RE = re.compile(r'\x1b\[[0-9;]*m')
-
-def vlen(s):
-    """Visible character length, ignoring ANSI escape codes."""
-    return len(ANSI_RE.sub('', s))
-
 def fmt(n):
     if n >= 1_000_000: return f"{n/1_000_000:.1f}M"
     if n >= 1_000:     return f"{n/1_000:.1f}k"
@@ -119,12 +113,7 @@ if   pct >= 80: ctx_color = RED
 elif pct >= 50: ctx_color = YLW
 else:           ctx_color = GRN
 
-# ── build segments ────────────────────────────────────────────────────────────
-left = (
-    f"{ctx_color}{pct}%{RST} of {fmt(size)}"
-    f" · last {fmt(last_call)} (sys ~{fmt(sys_est)})"
-)
-
+# ── assemble line ─────────────────────────────────────────────────────────────
 pct_5h, resets_5h, pct_7d, resets_7d = get_usage()
 
 right_parts = [f"${cost:.2f}"]
@@ -134,9 +123,9 @@ if pct_5h is not None:
     right_parts.append(f"{c5}5h {pct_5h:.0f}%{RST} {time_left(resets_5h)}")
     right_parts.append(f"{c7}7d {pct_7d:.0f}%{RST} {time_left(resets_7d)}")
 
-right = " · ".join(right_parts)
-
-# ── right-align ───────────────────────────────────────────────────────────────
-cols    = shutil.get_terminal_size(fallback=(120, 24)).columns
-padding = max(1, cols - vlen(left) - vlen(right) - 1)  # -1 for separator space
-print(f"{left}{' ' * padding}{right}")
+print(
+    f"{ctx_color}{pct}%{RST} of {fmt(size)}"
+    f" · last {fmt(last_call)} (sys ~{fmt(sys_est)})"
+    f"\t\t\t"
+    f"{' · '.join(right_parts)}"
+)
