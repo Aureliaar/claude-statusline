@@ -1,11 +1,11 @@
 # claude-statusline
 
-A minimal Claude Code status line that shows context window usage, per-turn token counts, and rolling usage totals.
+A minimal Claude Code status line that shows context window usage, per-turn token counts, and cumulative session cost.
 
 ## What it displays
 
 ```
-42% of 200.0k · last 18.3k (sys ~12.1k) · 5h 234.5k · 7d 1.2M
+42% of 200.0k · last 18.3k (sys ~12.1k) · $1.06
 ```
 
 | Field | Meaning |
@@ -14,8 +14,7 @@ A minimal Claude Code status line that shows context window usage, per-turn toke
 | `200.0k` | Total context window size for this session |
 | `last 18.3k` | Tokens consumed this turn (input + output + cache read + cache creation) |
 | `sys ~12.1k` | Estimated system prompt size — captured from the first call of the session |
-| `5h 234.5k` | Rolling total tokens across all sessions in the last 5 hours |
-| `7d 1.2M` | Rolling total tokens across all sessions in the last 7 days |
+| `$1.06` | Cumulative estimated cost of the whole session so far |
 
 ## Files
 
@@ -50,10 +49,9 @@ chmod +x ~/.claude/statusline-command.sh
 
 ## Persistent state
 
-The script maintains two data files under `~/.claude/`:
+The script maintains one data file under `~/.claude/`:
 
-- `statusline-baselines/<session_id>` — first-turn token count for each session, used as the system prompt estimate
-- `statusline-usage.jsonl` — append-only log of `{t: unix_timestamp, tokens: int}` entries; trimmed automatically to a 7-day window on every turn
+- `statusline-baselines/<session_id>` — first-turn token count for each session, used as the system prompt size estimate
 
 ## How it works
 
@@ -71,6 +69,9 @@ Claude Code's `statusLine` hook fires after each assistant turn and pipes a JSON
       "cache_read_input_tokens": 10000,
       "cache_creation_input_tokens": 2100
     }
+  },
+  "cost": {
+    "total_cost_usd": 1.06
   }
 }
 ```
@@ -78,9 +79,7 @@ Claude Code's `statusLine` hook fires after each assistant turn and pipes a JSON
 The script:
 1. Sums all four token fields → `last`
 2. Records the first-call total as a system prompt proxy → `sys`
-3. Appends this turn's tokens + timestamp to `statusline-usage.jsonl`
-4. Reads the log, sums tokens within 5h and 7d cutoffs → `5h` / `7d`
-5. Trims the log to the 7-day window and rewrites it
+3. Reads `cost.total_cost_usd` directly → session cost (already cumulative in the payload)
 
 ## Requirements
 
